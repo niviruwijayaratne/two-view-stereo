@@ -3,11 +3,11 @@ This was just a fun little implementation to test out some of the stuff I learne
 
 | Left Image      | Right Image | Depth Visualization |
 | :---: | :---: | :---: |
-| ![](Art/view1.png)| ![](Art/view5.png)|![](Art/wsize21.gif)|
-| ![](Books/view1.png)| ![](Books/view5.png)|![](Books/wsize21.gif)|
-| ![](Dolls/view1.png)| ![](Dolls/view5.png)|![](Dolls/wsize21.gif)|
-| ![](Drumsticks/view1.png)| ![](Drumsticks/view5.png)|![](Drumsticks/wsize21.gif)|
-| ![](Dwarves/view1.png)| ![](Dwarves/view5.png)|![](Dwarves/wsize21.gif)|
-| ![](Laundry/view1.png)| ![](Laundry/view5.png)|![](Laundry/wsize21.gif)|
-| ![](Moebius/view1.png)| ![](Moebius/view5.png)|![](Moebius/wsize21.gif)|
-|![](Reindeer/view1.png)| ![](Reindeer/view5.png)|![](Reindeer/wsize21.gif)|
+| ![](./data/Art/view1.png)| ![](./data/Art/view5.png)|![](./data/Art/wsize21.gif)|
+| ![](./data/Books/view1.png)| ![](./data/Books/view5.png)|![](./data/Books/wsize21.gif)|
+| ![](./data/Dolls/view1.png)| ![](./data/Dolls/view5.png)|![](./data/Dolls/wsize21.gif)|
+| ![](./data/Drumsticks/view1.png)| ![](./data/Drumsticks/view5.png)|![](./data/Drumsticks/wsize21.gif)|
+| ![](./data/Dwarves/view1.png)| ![](./data/Dwarves/view5.png)|![](./data/Dwarves/wsize21.gif)|
+| ![](./data/Laundry/view1.png)| ![](./data/Laundry/view5.png)|![](./data/Laundry/wsize21.gif)|
+| ![](./data/Moebius/view1.png)| ![](./data/Moebius/view5.png)|![](./data/Moebius/wsize21.gif)|
+|![](./data/Reindeer/view1.png)| ![](./data/Reindeer/view5.png)|![](./data/Reindeer/wsize21.gif)|
