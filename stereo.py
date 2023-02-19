@@ -70,20 +70,25 @@ def get_disparity(left_im, right_im, wsize, min_disp=10):
 def get_depth_from_disparity(matches, disparities, left_im):
     vertices = np.zeros((left_im.shape[0]*left_im.shape[1], 3))
     colors = np.zeros_like(vertices)
+    disparity_map = np.zeros((left_im.shape[0], left_im.shape[1]))
+    increment = max(disparities)/255
 
     for i, d in enumerate(disparities):
         y, x = matches[i, 0, 0], matches[i, 1, 0]
         depth = (b*f)/(3*(d + 200))
         vertices[i, :] = [x, -y, -depth]
         colors[i] = left_im[int(y), int(x)]
+        disparity_color = int(255 - (d*increment))
+        disparity_map[int(y), int(x)] = disparity_color
 
+    disparity_map = cv2.cvtColor(disparity_map.astype(np.uint8), cv2.COLOR_GRAY2RGB)
     vertices -= np.mean(vertices, axis=0)
     pcd = pytorch3d.structures.Pointclouds(
         points=torch.tensor(vertices, dtype=torch.float32).unsqueeze(0), 
         features=torch.tensor(colors/255.0, dtype=torch.float32).unsqueeze(0)
     )
     
-    return pcd
+    return pcd, disparity_map
 
 def visualize_matching(im1, im2, wsize):
     def callback(event):
@@ -164,14 +169,9 @@ def visualize_matching(im1, im2, wsize):
     plt.close()
 
 def visualize_pcd(pcd):
-
-    points = pcd.points_list()[0]
-    max_x = points[:, 0].max()
-    max_y = points[:, 1].max()
-    max_z = points[:, 2].max()
     
     R, T = look_at_view_transform(
-        dist=float(max_z.item()) + float(max_z.item())/5,
+        dist=612.0,
         elev=0, 
         azim=torch.linspace(-45, 45, 12)
 
@@ -180,15 +180,16 @@ def visualize_pcd(pcd):
     cameras = pytorch3d.renderer.FoVPerspectiveCameras(
         R = R, T = T
     )
-
+    
     scene = plot_scene({
         "Figure": {
             "PCD": pcd,
             "Camera": cameras,
         }
     })
-
+    
     scene.show()
+
     raster_settings = PointsRasterizationSettings(
         image_size=300, 
         radius = 0.003,
@@ -217,8 +218,11 @@ def save_gif(images, output_path, fps=15):
 
 if __name__ == '__main__':
     parser = ap.ArgumentParser()
-    parser.add_argument("--data_dir", type=str, default="./Art")
-    parser.add_argument("--wsize", type=int, default=15)
+    parser.add_argument("--data_dir", type=str)
+    parser.add_argument("--wsize", type=int, default=21)
+    parser.add_argument('--visualize_pcd', action=ap.BooleanOptionalAction)
+    parser.add_argument('--visualize_matching', action=ap.BooleanOptionalAction)
+    
     args = parser.parse_args()
 
     data_dir = args.data_dir
@@ -230,8 +234,11 @@ if __name__ == '__main__':
     wsize = args.wsize
 
     match_locs, disparities, left_disp, right_disp = get_disparity(left_im, right_im, wsize)
-    pcd = get_depth_from_disparity(match_locs, disparities, left_im)
+    pcd, disparity_map = get_depth_from_disparity(match_locs, disparities, left_im)
 
-    images = visualize_pcd(pcd)
-    save_gif(images, os.path.join(data_dir, f'wsize{wsize}.gif'), fps=4)
-    # visualize_matching(left_im, right_im, wsize)
+    if args.visualize_pcd:
+        images = visualize_pcd(pcd)
+        save_gif(images, os.path.join(data_dir, f'wsize{wsize}.gif'), fps=4)
+
+    if args.visualize_matching:
+        visualize_matching(left_im, right_im, wsize)
