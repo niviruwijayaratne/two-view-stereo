@@ -3,14 +3,31 @@ import matplotlib.pyplot as plt
 import cv2
 import os
 import time
-import open3d as o3d
+import torch
+import pytorch3d
+import imageio
+import argparse as ap
+
+from tqdm import trange
+from pytorch3d.vis.plotly_vis import plot_scene
+from pytorch3d.renderer import (
+    look_at_view_transform,
+    FoVOrthographicCameras, 
+    PointsRasterizationSettings,
+    PointsRenderer,
+    PulsarPointsRenderer,
+    PointsRasterizer,
+    AlphaCompositor,
+    NormWeightedCompositor
+)
 
 b = 160 #baseline, mm
 f = 3740 #focal length, pixels
-data_dir = "./Laundry"
 
 #Note images already rectified
 def get_disparity(left_im, right_im, wsize, min_disp=10):
+    print("Processing {}...".format(data_dir.split("/")[-1]))
+    print("Window Size: {}".format(wsize))
     t0 = time.time()
     H = left_im.shape[0]
     W = left_im.shape[1]
@@ -20,9 +37,8 @@ def get_disparity(left_im, right_im, wsize, min_disp=10):
     match_locs = np.zeros((H*W, 2, 2))
     
     pixel_counter = 0
-    for y in range(H):    
+    for y in trange(H):    
         for x_l in range(W):
-            print("Pixel at {}, {}".format(y, x_l))
             window_left = padded_left_im[y: y + wsize, x_l: x_l + wsize]
             curr_loc = [y, x_l]
             windows = []
@@ -61,10 +77,12 @@ def get_depth_from_disparity(matches, disparities, left_im):
         vertices[i, :] = [x, -y, -depth]
         colors[i] = left_im[int(y), int(x)]
 
-    pcd = o3d.geometry.PointCloud()
-    pcd.points = o3d.utility.Vector3dVector(vertices)
-    pcd.colors = o3d.utility.Vector3dVector(colors/255.0)
-
+    vertices -= np.mean(vertices, axis=0)
+    pcd = pytorch3d.structures.Pointclouds(
+        points=torch.tensor(vertices, dtype=torch.float32).unsqueeze(0), 
+        features=torch.tensor(colors/255.0, dtype=torch.float32).unsqueeze(0)
+    )
+    
     return pcd
 
 def visualize_matching(im1, im2, wsize):
@@ -145,14 +163,75 @@ def visualize_matching(im1, im2, wsize):
     plt.show()
     plt.close()
 
+def visualize_pcd(pcd):
+
+    points = pcd.points_list()[0]
+    max_x = points[:, 0].max()
+    max_y = points[:, 1].max()
+    max_z = points[:, 2].max()
+    
+    R, T = look_at_view_transform(
+        dist=float(max_z.item()) + float(max_z.item())/5,
+        elev=0, 
+        azim=torch.linspace(-45, 45, 12)
+
+    )
+
+    cameras = pytorch3d.renderer.FoVPerspectiveCameras(
+        R = R, T = T
+    )
+
+    scene = plot_scene({
+        "Figure": {
+            "PCD": pcd,
+            "Camera": cameras,
+        }
+    })
+
+    scene.show()
+    raster_settings = PointsRasterizationSettings(
+        image_size=300, 
+        radius = 0.003,
+        points_per_pixel = 10
+    )
+
+    rasterizer = PointsRasterizer(cameras=cameras, raster_settings=raster_settings)
+    renderer = PointsRenderer(
+        rasterizer=rasterizer,
+        compositor=AlphaCompositor(background_color=(1, 1, 1))
+    )
+
+    print("Rendering...")
+    t0 = time.time()
+    images = renderer(pcd.extend(12))
+    images = images[:, :, :, :3].numpy()
+    final_images = np.zeros((images.shape[0]*2, images.shape[1], images.shape[2], images.shape[3]))
+    final_images[:images.shape[0]] = images
+    final_images[images.shape[0]:] = np.flip(images, axis=0)
+    print("Took {} minutes".format((time.time() - t0)/60.0))
+
+    return final_images
+
+def save_gif(images, output_path, fps=15):
+    imageio.mimsave(output_path, images, fps=fps)
+
 if __name__ == '__main__':
+    parser = ap.ArgumentParser()
+    parser.add_argument("--data_dir", type=str, default="./Art")
+    parser.add_argument("--wsize", type=int, default=15)
+    args = parser.parse_args()
+
+    data_dir = args.data_dir
     left_im = cv2.imread(os.path.join(data_dir, "view1.png"))
     right_im = cv2.imread(os.path.join(data_dir, "view5.png"))
     left_im = cv2.cvtColor(left_im, cv2.COLOR_BGR2RGB)
     right_im = cv2.cvtColor(right_im, cv2.COLOR_BGR2RGB)
-    wsize = 21
+    
+    wsize = args.wsize
 
     match_locs, disparities, left_disp, right_disp = get_disparity(left_im, right_im, wsize)
     pcd = get_depth_from_disparity(match_locs, disparities, left_im)
-    o3d.visualization.draw_geometries([pcd])
+
+    images = visualize_pcd(pcd)
+    save_gif(images, os.path.join(data_dir, f'wsize{wsize}.gif'), fps=4)
     # visualize_matching(left_im, right_im, wsize)
